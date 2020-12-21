@@ -218,6 +218,7 @@ int getVifIx( struct IfDesc *IfDp );
 int loadConfig(char *configFile);
 void configureVifs(void);
 struct Config *getCommonConfig(void);
+uint32_t getFinalDestinationAddress(uint32_t address);
 
 /* igmp.c
 */

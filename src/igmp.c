@@ -165,6 +165,10 @@ void acceptIgmp(int recvlen) {
                                 inetFmt(src, s1), inetFmt(dst, s2), i);
                         }
                     } else {
+                        uint32_t alteredDst = getFinalDestinationAddress(dst);
+                        if (alteredDst != dst) {
+                            my_log(LOG_DEBUG, 0, "Mapped destination: %s -> %s", inetFmt(dst, s1), inetFmt(alteredDst, s2));
+                        }
                         // Activate the route.
                         int vifindex = checkVIF->index;
                         my_log(LOG_DEBUG, 0, "Route activate request from %s to %s on VIF[%d]",
@@ -206,7 +210,7 @@ void acceptIgmp(int recvlen) {
     switch (igmp->igmp_type) {
     case IGMP_V1_MEMBERSHIP_REPORT:
     case IGMP_V2_MEMBERSHIP_REPORT:
-        group = igmp->igmp_group.s_addr;
+        group = getFinalDestinationAddress(igmp->igmp_group.s_addr);
         acceptGroupReport(src, group);
         return;
 
@@ -217,7 +221,7 @@ void acceptIgmp(int recvlen) {
         while (ngrec--) {
             if ((uint8_t *)igmpv3 + ipdatalen < (uint8_t *)grec + sizeof(*grec))
                 break;
-            group = grec->grec_mca.s_addr;
+            group = getFinalDestinationAddress(grec->grec_mca.s_addr);
             nsrcs = ntohs(grec->grec_nsrcs);
             switch (grec->grec_type) {
             case IGMPV3_MODE_IS_INCLUDE:
@@ -246,7 +250,7 @@ void acceptIgmp(int recvlen) {
         return;
 
     case IGMP_V2_LEAVE_GROUP:
-        group = igmp->igmp_group.s_addr;
+        group = getFinalDestinationAddress(igmp->igmp_group.s_addr);
         acceptLeaveMessage(src, group);
         return;
 

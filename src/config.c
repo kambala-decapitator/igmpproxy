@@ -58,12 +58,21 @@ struct vifconfig {
 // Structure to keep vif configuration
 struct vifconfig *vifconf;
 
+struct AlterSubscriptionConfig {
+    uint32_t originalAddress;
+    uint32_t alteredAddress;
+    struct AlterSubscriptionConfig* next;
+};
+
+struct AlterSubscriptionConfig* alterConf;
+
 // Keeps common settings...
 static struct Config commonConfig;
 
 // Prototypes...
 struct vifconfig *parsePhyintToken(void);
 struct SubnetList *parseSubnetAddress(char *addrstr);
+struct AlterSubscriptionConfig* parseAlterToken(void);
 
 /**
 *   Initializes common config..
@@ -107,6 +116,7 @@ struct Config *getCommonConfig(void) {
 int loadConfig(char *configFile) {
     struct vifconfig  *tmpPtr;
     struct vifconfig  **currPtr = &vifconf;
+    struct AlterSubscriptionConfig* tmpAlterPtr;
     char *token;
 
     // Initialize common config
@@ -196,6 +206,15 @@ int loadConfig(char *configFile) {
             // Read next token...
             token = nextConfigToken();
             continue;
+        }
+        else if(strcmp("alter", token)==0) {
+            alterConf = parseAlterToken();
+            if(alterConf == NULL) {
+                // Unparsable token... Exit...
+                closeConfigFile();
+                my_log(LOG_WARNING, 0, "Unknown token '%s' in configfile", token);
+                return 0;
+            }
         } else {
             // Unparsable token... Exit...
             closeConfigFile();
@@ -429,4 +448,61 @@ struct SubnetList *parseSubnetAddress(char *addrstr) {
             inetFmts(tmpSubnet->subnet_addr, tmpSubnet->subnet_mask,s1));
 
     return tmpSubnet;
+}
+
+struct AlterSubscriptionConfig* parseAlterToken(void) {
+    struct AlterSubscriptionConfig* tmpAlterConfig = NULL;
+    struct AlterSubscriptionConfig** curAlterConfig = &tmpAlterConfig;
+    do {
+        uint32_t originalAddress, alteredAddress;
+        uint32_t* addresses[2] = {&originalAddress, &alteredAddress};
+        for (int i = 0; i < 2; ++i) {
+            char *token = nextConfigToken();
+            if (token == NULL) {
+                my_log(LOG_DEBUG, 0, "stopping parseAlterToken on step %d", i);
+                return tmpAlterConfig;
+                /*
+                if (i == 0) {
+                }
+
+                if (tmpConfig) {
+                    free(tmpConfig);
+                }
+                return NULL;
+                */
+            }
+
+            struct SubnetList* subnet = parseSubnetAddress(token);
+            if (subnet == NULL) {
+                my_log(LOG_ERR, 0, "Config: Alter: can't parse address %s", token);
+                return tmpAlterConfig;
+                /*
+                if (tmpConfig) {
+                    free(tmpConfig);
+                }
+                return NULL;
+                */
+            }
+            *addresses[i] = subnet->subnet_addr;
+            free(subnet);
+        }
+
+        *curAlterConfig = (struct AlterSubscriptionConfig*) malloc(sizeof(struct AlterSubscriptionConfig));
+        (*curAlterConfig)->originalAddress = originalAddress;
+        (*curAlterConfig)->alteredAddress = alteredAddress;
+        my_log(LOG_DEBUG, 0, "Config: alter: %s -> %s", inetFmt(originalAddress, s1), inetFmt(alteredAddress, s2));
+        (*curAlterConfig)->next = NULL;
+        curAlterConfig = &(*curAlterConfig)->next;
+    } while(true);
+}
+
+uint32_t getFinalDestinationAddress(uint32_t address) {
+    struct AlterSubscriptionConfig** curAlterConfig = &alterConf;
+    while (*curAlterConfig != NULL) {
+        if ((*curAlterConfig)->originalAddress == address) {
+            return (*curAlterConfig)->alteredAddress;
+        }
+        curAlterConfig = &(*curAlterConfig)->next;
+    }
+    return address;
 }
