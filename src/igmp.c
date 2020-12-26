@@ -167,13 +167,13 @@ void acceptIgmp(int recvlen) {
                     } else {
                         uint32_t alteredDst = getFinalDestinationAddress(dst);
                         if (alteredDst != dst) {
-                            my_log(LOG_DEBUG, 0, "Mapped destination: %s -> %s", inetFmt(dst, s1), inetFmt(alteredDst, s2));
+                            my_log(LOG_INFO, 0, "Mapped destination: %s -> %s", inetFmt(dst, s1), inetFmt(alteredDst, s2));
                         }
                         // Activate the route.
                         int vifindex = checkVIF->index;
                         my_log(LOG_DEBUG, 0, "Route activate request from %s to %s on VIF[%d]",
-                            inetFmt(src,s1), inetFmt(dst,s2), vifindex);
-                        activateRoute(dst, src, vifindex);
+                            inetFmt(src,s1), inetFmt(alteredDst,s2), vifindex);
+                        activateRoute(alteredDst, src, vifindex);
                         i = MAX_UPS_VIFS;
                     }
                 } else {
